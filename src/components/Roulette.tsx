@@ -108,6 +108,7 @@ export const Roulette = () => {
       setTxStatus('pending');
       setTxMessage('Envoi de la transaction...');
 
+      // Créer la transaction avec un message descriptif
       const transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
@@ -116,18 +117,26 @@ export const Roulette = () => {
         })
       );
 
-      // Obtenir le recentBlockhash
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
+      // Ajouter des métadonnées pour plus de transparence
+      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       transaction.feePayer = publicKey;
+
+      setTxMessage(`Envoi de ${PARTICIPATION_COST} SOL pour participer à la roulette...`);
 
       const { signature } = await sendTransactionWithRetry(transaction, [], {
         maxRetries: 3,
         delayMs: 1000,
       });
 
+      // Attendre la confirmation de la transaction
+      const confirmation = await connection.confirmTransaction(signature);
+      
+      if (confirmation.value.err) {
+        throw new Error('La transaction a été rejetée');
+      }
+
       setTxStatus('success');
-      setTxMessage('Transaction réussie!');
+      setTxMessage(`Transaction réussie! Vous avez envoyé ${PARTICIPATION_COST} SOL pour participer.`);
       setTxSignature(signature);
 
       startSpin();
