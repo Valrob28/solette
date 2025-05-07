@@ -106,44 +106,61 @@ export const Roulette = () => {
 
     try {
       setTxStatus('pending');
-      setTxMessage('Envoi de la transaction...');
+      setTxMessage(`Préparation de la transaction de ${PARTICIPATION_COST} SOL...`);
 
-      // Créer la transaction avec un message descriptif
-      const transaction = new Transaction().add(
+      // Créer la transaction
+      const transaction = new Transaction();
+      
+      // Ajouter l'instruction de transfert
+      transaction.add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: HOUSE_WALLET,
-          lamports: PARTICIPATION_COST * 1e9,
+          lamports: Math.floor(PARTICIPATION_COST * 1e9), // Conversion en lamports avec arrondi
         })
       );
 
-      // Ajouter des métadonnées pour plus de transparence
-      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      // Obtenir le dernier blockhash
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
-      setTxMessage(`Envoi de ${PARTICIPATION_COST} SOL pour participer à la roulette...`);
-
+      // Envoyer la transaction avec le wallet
       const { signature } = await sendTransactionWithRetry(transaction, [], {
         maxRetries: 3,
         delayMs: 1000,
       });
 
-      // Attendre la confirmation de la transaction
-      const confirmation = await connection.confirmTransaction(signature);
-      
+      setTxMessage('En attente de confirmation...');
+
+      // Attendre la confirmation avec un timeout
+      const confirmation = await connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight
+      }, 'confirmed');
+
       if (confirmation.value.err) {
         throw new Error('La transaction a été rejetée');
       }
 
       setTxStatus('success');
-      setTxMessage(`Transaction réussie! Vous avez envoyé ${PARTICIPATION_COST} SOL pour participer.`);
+      setTxMessage(`Transaction confirmée! Vous avez envoyé ${PARTICIPATION_COST} SOL.`);
       setTxSignature(signature);
 
       startSpin();
     } catch (error) {
       console.error('Erreur de transaction:', error);
       setTxStatus('error');
-      setTxMessage(error instanceof Error ? error.message : 'Erreur inconnue');
+      if (error instanceof Error) {
+        if (error.message.includes('User rejected')) {
+          setTxMessage('Transaction annulée par l\'utilisateur');
+        } else {
+          setTxMessage(`Erreur: ${error.message}`);
+        }
+      } else {
+        setTxMessage('Erreur inconnue lors de la transaction');
+      }
     }
   };
 
