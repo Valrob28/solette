@@ -116,6 +116,11 @@ export const Roulette = () => {
         })
       );
 
+      // Obtenir le recentBlockhash
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+
       const { signature } = await sendTransactionWithRetry(transaction, [], {
         maxRetries: 3,
         delayMs: 1000,
