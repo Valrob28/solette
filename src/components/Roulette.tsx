@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useConnection } from '@solana/wallet-adapter-react';
@@ -17,14 +17,14 @@ import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 import { MusicPlayer } from './MusicPlayer';
 
 const segments = [
-  { label: '1 SOL', color: '#14F195', isGain: true, amount: 1 },
-  { label: '0.5 SOL', color: '#9945FF', isGain: true, amount: 0.5 },
+  { label: '0.1 SOL', color: '#14F195', isGain: true, amount: 0.1 },
+  { label: '0.05 SOL', color: '#9945FF', isGain: true, amount: 0.05 },
   { label: 'Essaye encore', color: '#14F195', isGain: false, amount: 0 },
-  { label: '0.1 SOL', color: '#9945FF', isGain: false, amount: 0 },
+  { label: '0.01 SOL', color: '#9945FF', isGain: false, amount: 0 },
   { label: 'Rien', color: '#14F195', isGain: false, amount: 0 },
-  { label: '0.2 SOL', color: '#9945FF', isGain: true, amount: 0.2 },
+  { label: '0.02 SOL', color: '#9945FF', isGain: true, amount: 0.02 },
   { label: 'Perdu', color: '#14F195', isGain: false, amount: 0 },
-  { label: '0.3 SOL', color: '#9945FF', isGain: true, amount: 0.3 },
+  { label: '0.03 SOL', color: '#9945FF', isGain: true, amount: 0.03 },
 ];
 
 const RADIUS = 160;
@@ -199,21 +199,15 @@ export const Roulette = () => {
     console.log('Transaction à signer:', transaction);
   };
 
-  // Démarrer la musique automatiquement au chargement
-  useEffect(() => {
-    const startMusic = async () => {
-      try {
-        await new Audio('/sounds/background-music.mp3').play();
-        togglePlay();
-      } catch (error) {
-        console.error('Erreur lors du démarrage de la musique:', error);
-      }
-    };
-    startMusic();
-  }, [togglePlay]);
+  // Démarrer la musique après une interaction utilisateur
+  const handleFirstInteraction = useCallback(() => {
+    if (!isPlaying) {
+      togglePlay();
+    }
+  }, [isPlaying, togglePlay]);
 
   return (
-    <div className="flex flex-col items-center space-y-8">
+    <div className="flex flex-col items-center space-y-8" onClick={handleFirstInteraction}>
       <MusicPlayer
         isPlaying={isPlaying}
         volume={volume}
