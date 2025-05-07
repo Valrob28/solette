@@ -1,6 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useTransactionRetry } from '../hooks/useTransactionRetry';
+import { TransactionStatus } from './TransactionStatus';
+import { Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
+import { usePayout } from '../hooks/usePayout';
+import { useGameStats } from '../hooks/useGameStats';
+import { GameStats } from './GameStats';
+import { motion, AnimatePresence } from 'framer-motion';
+import { WinAnimation } from './WinAnimation';
+import { LoseAnimation } from './LoseAnimation';
+import { useSound } from '../hooks/useSound';
+import { PendingPayouts } from './PendingPayouts';
+import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
+import { MusicPlayer } from './MusicPlayer';
 
 const segments = [
   { label: '1 SOL', color: '#14F195', isGain: true, amount: 1 },
@@ -17,7 +31,8 @@ const RADIUS = 160;
 const CENTER = 170;
 const SEG_ANGLE = 360 / segments.length;
 const ANIMATION_DURATION = 10000; // 10 secondes
-const PARTICIPATION_COST = 0.1;
+const PARTICIPATION_COST = 0.01;
+const HOUSE_WALLET = new PublicKey('J9jajCmn8JRbF2E2Je5HPLJgjExFyf6Zf93B2CE146wV');
 
 const getRotationForIndex = (index: number) => {
   return 360 * 10 - index * SEG_ANGLE - SEG_ANGLE / 2;
@@ -38,22 +53,35 @@ const getRandomIndexWithProbability = () => {
   }
 };
 
-const Roulette: React.FC = () => {
+export const Roulette = () => {
   const { publicKey, connected } = useWallet();
+  const { connection } = useConnection();
+  const { sendTransactionWithRetry } = useTransactionRetry(connection);
+  const { createPayoutTransaction, getPendingPayouts, updatePayoutStatus, pendingPayouts } = usePayout(connection);
+  const { balance, stats, updateStats } = useGameStats(connection);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [resultIndex, setResultIndex] = useState<number|null>(null);
   const [showResult, setShowResult] = useState(false);
-  const [balance, setBalance] = useState(0); // Solde gagné
+  const [gameBalance, setGameBalance] = useState(0); // Solde gagné
   const [replayed, setReplayed] = useState(0); // Solde rejoué
   const [resetKey, setResetKey] = useState(0); // Pour forcer le refresh SVG
+  const [txStatus, setTxStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [txMessage, setTxMessage] = useState<string>('');
+  const [txSignature, setTxSignature] = useState<string>('');
+  const [showStats, setShowStats] = useState(false);
+  const [showWinAnimation, setShowWinAnimation] = useState(false);
+  const [winAmount, setWinAmount] = useState(0);
+  const [showLoseAnimation, setShowLoseAnimation] = useState(false);
+  const { playWin, playLose, playSpin } = useSound();
+  const { isPlaying, volume, togglePlay, setMusicVolume } = useBackgroundMusic();
 
   // Solde à claim = gains cumulés - rejoué
-  const claimable = Math.max(0, balance - replayed);
+  const claimable = Math.max(0, gameBalance - replayed);
 
   const startSpin = () => {
     setIsSpinning(true);
-    // Réinitialise la roue pour forcer l'animation (resetKey change la clé du SVG)
+    playSpin();
     setResetKey(k => k + 1);
     setRotation(0);
     setTimeout(() => {
@@ -65,18 +93,50 @@ const Roulette: React.FC = () => {
         setIsSpinning(false);
         setShowResult(true);
       }, ANIMATION_DURATION);
-    }, 50); // Laisse le temps au DOM de reset la rotation
+    }, 50);
   };
 
   const handleSpinClick = async () => {
-    if (!connected || isSpinning) return;
-    startSpin();
+    if (!connected || isSpinning || !publicKey) return;
+    if (gameBalance < PARTICIPATION_COST) {
+      setTxStatus('error');
+      setTxMessage('Solde insuffisant pour jouer');
+      return;
+    }
+
+    try {
+      setTxStatus('pending');
+      setTxMessage('Envoi de la transaction...');
+
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: HOUSE_WALLET,
+          lamports: PARTICIPATION_COST * 1e9,
+        })
+      );
+
+      const { signature } = await sendTransactionWithRetry(transaction, [], {
+        maxRetries: 3,
+        delayMs: 1000,
+      });
+
+      setTxStatus('success');
+      setTxMessage('Transaction réussie!');
+      setTxSignature(signature);
+
+      startSpin();
+    } catch (error) {
+      console.error('Erreur de transaction:', error);
+      setTxStatus('error');
+      setTxMessage(error instanceof Error ? error.message : 'Erreur inconnue');
+    }
   };
 
   const handleReplay = () => {
     setShowResult(false);
     if (resultIndex !== null && segments[resultIndex].isGain && segments[resultIndex].amount > 0) {
-      setBalance(b => b - segments[resultIndex].amount);
+      setGameBalance(b => b - segments[resultIndex].amount);
       setReplayed(r => r + segments[resultIndex].amount);
     } else {
       setReplayed(r => r + PARTICIPATION_COST);
@@ -89,13 +149,84 @@ const Roulette: React.FC = () => {
   const handleClaim = () => {
     setShowResult(false);
     if (resultIndex !== null && segments[resultIndex].isGain && segments[resultIndex].amount > 0) {
-      setBalance(b => b + segments[resultIndex].amount);
+      setGameBalance(b => b + segments[resultIndex].amount);
     }
     setResultIndex(null);
   };
 
+  const handleSpinEnd = async (winningIndex: number) => {
+    const segment = segments[winningIndex];
+    const winAmount = segment.isGain ? segment.amount : 0;
+    
+    updateStats(PARTICIPATION_COST, winAmount);
+    
+    if (segment.isGain && segment.amount > 0) {
+      try {
+        setTxStatus('pending');
+        setTxMessage('Création de la transaction de gain...');
+        
+        const payoutId = await createPayoutTransaction(segment.amount);
+        
+        setTxStatus('success');
+        setTxMessage(`Félicitations! Vous avez gagné ${segment.amount} SOL! La transaction est en attente de signature.`);
+        
+        // Afficher l'animation de gain
+        setWinAmount(segment.amount);
+        setShowWinAnimation(true);
+        playWin();
+        setTimeout(() => setShowWinAnimation(false), 2000);
+      } catch (error) {
+        console.error('Erreur lors de la création de la transaction:', error);
+        setTxStatus('error');
+        setTxMessage(error instanceof Error ? error.message : 'Erreur lors de la création de la transaction');
+      }
+    } else {
+      setTxStatus('idle');
+      setTxMessage('');
+      setTxSignature('');
+      
+      // Afficher l'animation de perte
+      setShowLoseAnimation(true);
+      playLose();
+      setTimeout(() => setShowLoseAnimation(false), 2000);
+    }
+  };
+
+  const handleSignTransaction = async (transaction: Transaction) => {
+    // Cette fonction sera appelée par le composant PendingPayouts
+    // Vous devrez implémenter la logique de signature ici
+    // Par exemple, en utilisant votre wallet ou un autre système de signature
+    console.log('Transaction à signer:', transaction);
+  };
+
+  // Démarrer la musique automatiquement au chargement
+  useEffect(() => {
+    const startMusic = async () => {
+      try {
+        await new Audio('/sounds/background-music.mp3').play();
+        togglePlay();
+      } catch (error) {
+        console.error('Erreur lors du démarrage de la musique:', error);
+      }
+    };
+    startMusic();
+  }, [togglePlay]);
+
   return (
     <div className="flex flex-col items-center space-y-8">
+      <MusicPlayer
+        isPlaying={isPlaying}
+        volume={volume}
+        onTogglePlay={togglePlay}
+        onVolumeChange={setMusicVolume}
+      />
+      <WinAnimation amount={winAmount} isVisible={showWinAnimation} />
+      <LoseAnimation isVisible={showLoseAnimation} />
+      <PendingPayouts
+        payouts={getPendingPayouts()}
+        onSignTransaction={handleSignTransaction}
+        onUpdateStatus={updatePayoutStatus}
+      />
       <div className="flex flex-col items-center space-y-4">
         <WalletMultiButton className="!bg-solana-purple hover:!bg-solana-purple/80" />
         {connected && publicKey && (
@@ -103,6 +234,24 @@ const Roulette: React.FC = () => {
             Connecté avec : {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
           </p>
         )}
+        <button
+          onClick={() => setShowStats(!showStats)}
+          className="px-4 py-2 bg-gray-700 rounded-lg text-white hover:bg-gray-600 transition"
+        >
+          {showStats ? 'Masquer les stats' : 'Voir les stats'}
+        </button>
+        <AnimatePresence>
+          {showStats && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="w-full max-w-md"
+            >
+              <GameStats stats={stats} balance={gameBalance} />
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="flex space-x-6 mt-2">
           <div className="bg-gray-800 px-4 py-2 rounded-lg text-center">
             <span className="block text-xs text-gray-400">Solde à claim</span>
@@ -110,7 +259,7 @@ const Roulette: React.FC = () => {
           </div>
           <div className="bg-gray-800 px-4 py-2 rounded-lg text-center">
             <span className="block text-xs text-gray-400">Total gagné</span>
-            <span className="text-lg font-bold text-solana-green">{balance.toFixed(2)} SOL</span>
+            <span className="text-lg font-bold text-solana-green">{gameBalance.toFixed(2)} SOL</span>
           </div>
           <div className="bg-gray-800 px-4 py-2 rounded-lg text-center">
             <span className="block text-xs text-gray-400">Total rejoué</span>
@@ -189,7 +338,7 @@ const Roulette: React.FC = () => {
               : 'bg-solana-green hover:bg-solana-green/80 text-black'}
           `}
         >
-          {isSpinning ? 'La roue tourne...' : 'Lancer (0.1 SOL)'}
+          {isSpinning ? 'La roue tourne...' : 'Lancer (0.01 SOL)'}
         </button>
         {/* Popup de résultat */}
         {showResult && resultIndex !== null && (
@@ -218,8 +367,11 @@ const Roulette: React.FC = () => {
           </div>
         )}
       </div>
+      <TransactionStatus
+        status={txStatus}
+        message={txMessage}
+        signature={txSignature}
+      />
     </div>
   );
-};
-
-export default Roulette; 
+}; 
