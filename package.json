@@ -17,6 +17,7 @@
     "@solana/wallet-adapter-react-ui": "^0.9.31",
     "@solana/wallet-adapter-wallets": "^0.19.19",
     "@solana/web3.js": "^1.78.5",
+    "framer-motion": "^12.10.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -35,4 +36,4 @@
     "typescript": "^5.2.2",
     "vite": "^5.0.8"
   }
-} 
+}
