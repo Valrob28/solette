@@ -98,7 +98,7 @@ export const Roulette = () => {
 
   const handleSpinClick = async () => {
     if (!connected || isSpinning || !publicKey) return;
-    if (gameBalance < PARTICIPATION_COST) {
+    if (balance < PARTICIPATION_COST) {
       setTxStatus('error');
       setTxMessage('Solde insuffisant pour jouer');
       return;
@@ -368,4 +368,6 @@ export const Roulette = () => {
       />
     </div>
   );
-}; 
+};
+
+export default Roulette; 
