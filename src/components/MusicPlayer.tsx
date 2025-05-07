@@ -1,37 +1,40 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { SpeakerWaveIcon, SpeakerXMarkIcon, PlayIcon, PauseIcon } from '@heroicons/react/24/solid';
 
 interface MusicPlayerProps {
   isPlaying: boolean;
   volume: number;
   onTogglePlay: () => void;
   onVolumeChange: (volume: number) => void;
+  error?: string | null;
 }
 
 export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   isPlaying,
   volume,
   onTogglePlay,
-  onVolumeChange
+  onVolumeChange,
+  error
 }) => {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="fixed top-4 right-4 bg-gray-800 rounded-lg p-3 shadow-lg flex items-center space-x-3"
-    >
+    <div className="fixed bottom-4 right-4 bg-gray-800 p-4 rounded-lg shadow-lg flex items-center space-x-4">
       <button
         onClick={onTogglePlay}
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-solana-purple hover:bg-solana-purple/80 transition"
+        className="text-white hover:text-solana-green transition-colors"
       >
         {isPlaying ? (
-          <span className="text-white">⏸</span>
+          <PauseIcon className="h-6 w-6" />
         ) : (
-          <span className="text-white">▶</span>
+          <PlayIcon className="h-6 w-6" />
         )}
       </button>
+      
       <div className="flex items-center space-x-2">
-        <span className="text-white text-sm">🔈</span>
+        {volume === 0 ? (
+          <SpeakerXMarkIcon className="h-5 w-5 text-white" />
+        ) : (
+          <SpeakerWaveIcon className="h-5 w-5 text-white" />
+        )}
         <input
           type="range"
           min="0"
@@ -41,8 +44,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
           className="w-24"
         />
-        <span className="text-white text-sm">🔊</span>
       </div>
-    </motion.div>
+
+      {error && (
+        <div className="text-red-500 text-sm ml-4">
+          {error}
+        </div>
+      )}
+    </div>
   );
 }; 

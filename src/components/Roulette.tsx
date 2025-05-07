@@ -74,7 +74,7 @@ export const Roulette = () => {
   const [winAmount, setWinAmount] = useState(0);
   const [showLoseAnimation, setShowLoseAnimation] = useState(false);
   const { playWin, playLose, playSpin } = useSound();
-  const { isPlaying, volume, togglePlay, setMusicVolume } = useBackgroundMusic();
+  const { isPlaying, volume, togglePlay, setMusicVolume, error } = useBackgroundMusic();
 
   // Solde à claim = gains cumulés - rejoué
   const claimable = Math.max(0, gameBalance - replayed);
@@ -213,6 +213,7 @@ export const Roulette = () => {
         volume={volume}
         onTogglePlay={togglePlay}
         onVolumeChange={setMusicVolume}
+        error={error}
       />
       <WinAnimation amount={winAmount} isVisible={showWinAnimation} />
       <LoseAnimation isVisible={showLoseAnimation} />

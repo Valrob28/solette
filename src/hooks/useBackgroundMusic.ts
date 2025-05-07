@@ -5,35 +5,61 @@ export const useBackgroundMusic = () => {
   const [volume, setVolume] = useState(0.5);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialiser l'audio une seule fois
   useEffect(() => {
     if (!isInitialized) {
-      audioRef.current = new Audio('/sounds/background-music.mp3');
-      audioRef.current.loop = true;
-      audioRef.current.volume = volume;
-      setIsInitialized(true);
+      try {
+        const audio = new Audio();
+        audio.src = '/sounds/background-music.mp3';
+        audio.loop = true;
+        audio.volume = volume;
+        
+        // Ajouter des gestionnaires d'événements pour le débogage
+        audio.addEventListener('error', (e) => {
+          console.error('Erreur audio:', e);
+          setError(`Erreur de chargement audio: ${audio.error?.message || 'Erreur inconnue'}`);
+        });
+
+        audio.addEventListener('canplaythrough', () => {
+          console.log('Audio prêt à être joué');
+          setError(null);
+        });
+
+        audioRef.current = audio;
+        setIsInitialized(true);
+      } catch (err) {
+        console.error('Erreur lors de l\'initialisation de l\'audio:', err);
+        setError('Erreur lors de l\'initialisation de l\'audio');
+      }
     }
   }, [isInitialized, volume]);
 
   const play = useCallback(async () => {
     if (audioRef.current) {
       try {
-        // Sur Firefox, on doit attendre une interaction utilisateur
+        console.log('Tentative de lecture audio...');
         await audioRef.current.play();
         setIsPlaying(true);
+        setError(null);
       } catch (error) {
         console.error('Erreur lors de la lecture:', error);
-        // Afficher un message à l'utilisateur pour qu'il interagisse avec la page
-        alert('Cliquez n\'importe où sur la page pour activer la musique');
+        setError('Erreur lors de la lecture. Cliquez n\'importe où sur la page pour activer la musique.');
       }
     }
   }, []);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+      try {
+        audioRef.current.pause();
+        setIsPlaying(false);
+        setError(null);
+      } catch (error) {
+        console.error('Erreur lors de la pause:', error);
+        setError('Erreur lors de la pause');
+      }
     }
   }, []);
 
@@ -58,6 +84,7 @@ export const useBackgroundMusic = () => {
     play,
     pause,
     togglePlay,
-    setMusicVolume
+    setMusicVolume,
+    error
   };
 }; 
