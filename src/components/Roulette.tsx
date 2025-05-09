@@ -15,6 +15,7 @@ import { useSound } from '../hooks/useSound';
 import { PendingPayouts } from './PendingPayouts';
 import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 import { MusicPlayer } from './MusicPlayer';
+import { TokenTracker } from './TokenTracker';
 
 const segments = [
   { label: '0.1 SOL', color: '#14F195', isGain: true, amount: 0.1 },
@@ -239,6 +240,7 @@ export const Roulette = () => {
 
   return (
     <div className="flex flex-col items-center space-y-8" onClick={handleFirstInteraction}>
+      <TokenTracker />
       <MusicPlayer
         isPlaying={isPlaying}
         volume={volume}
