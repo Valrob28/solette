@@ -69,6 +69,13 @@ function App() {
           >
             <div className="fire-background"></div>
             <FloatingHearts />
+            <div className="absolute top-4 right-4 z-20">
+              <img 
+                src="/images/logo.png" 
+                alt="MagicSpinner Logo" 
+                className="w-16 h-16 object-contain hover:scale-110 transition-transform duration-200"
+              />
+            </div>
             <div className="container mx-auto px-4 py-8 relative z-10">
               <h1 className="text-4xl font-bold text-center mb-4 animate-shine bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 bg-clip-text text-transparent">
                 MagicSpinner
