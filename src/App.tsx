@@ -5,6 +5,8 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adap
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
 import Roulette from './components/Roulette';
+import { useClickSound } from './hooks/useClickSound';
+import { FloatingHearts } from './components/FloatingHearts';
 
 // Import the styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -26,6 +28,8 @@ const RPC_ENDPOINTS = {
 };
 
 function App() {
+  const playClickSound = useClickSound();
+
   // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
   const network = 'mainnet-beta' as WalletAdapterNetwork;
 
@@ -59,10 +63,22 @@ function App() {
     <ConnectionProvider endpoint={endpoint.http} config={{ wsEndpoint: endpoint.ws }}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
-          <div className="min-h-screen bg-gray-900 text-white">
-            <div className="container mx-auto px-4 py-8">
-              <h1 className="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-solana-purple to-solana-green bg-clip-text text-transparent">
-                Solana Roulette
+          <div 
+            className="min-h-screen text-white"
+            onClick={playClickSound}
+          >
+            <div className="fire-background"></div>
+            <FloatingHearts />
+            <div className="absolute top-4 right-4 z-20">
+              <img 
+                src="/images/logo.png" 
+                alt="Logo" 
+                className="w-16 h-16 object-contain hover:scale-110 transition-transform duration-200"
+              />
+            </div>
+            <div className="container mx-auto px-4 py-8 relative z-10">
+              <h1 className="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
+                AncientSpinner
               </h1>
               <Roulette />
             </div>
