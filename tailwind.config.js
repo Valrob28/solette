@@ -7,11 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        'solana': {
-          'green': '#14F195',
-          'purple': '#9945FF',
-        },
+        'solana-green': '#14F195',
+        'solana-purple': '#9945FF',
       },
+      keyframes: {
+        shine: {
+          '0%': { backgroundPosition: '200% center' },
+          '100%': { backgroundPosition: '-200% center' },
+        }
+      },
+      animation: {
+        shine: 'shine 8s linear infinite',
+      }
     },
   },
   plugins: [],

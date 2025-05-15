@@ -15,7 +15,6 @@ import { useSound } from '../hooks/useSound';
 import { PendingPayouts } from './PendingPayouts';
 import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 import { MusicPlayer } from './MusicPlayer';
-import { TokenTracker } from './TokenTracker';
 
 const segments = [
   { label: '0.1 SOL', color: '#14F195', isGain: true, amount: 0.1 },
@@ -73,6 +72,9 @@ export const Roulette = () => {
   const [spinCount, setSpinCount] = useState(0);
   const [selectedSpins, setSelectedSpins] = useState(1);
   const [isMaxSpinsReached, setIsMaxSpinsReached] = useState(false);
+  const [spinResults, setSpinResults] = useState<Array<{amount: number, isGain: boolean}>>([]);
+  const [showAllResults, setShowAllResults] = useState(false);
+  const [totalWinAmount, setTotalWinAmount] = useState(0);
 
   // Solde à claim = gains cumulés - rejoué
   const claimable = Math.max(0, gameBalance - replayed);
@@ -196,6 +198,10 @@ export const Roulette = () => {
     const segment = segments[winningIndex];
     const winAmount = segment.isGain ? segment.amount * selectedSpins : 0;
     
+    // Ajouter le résultat au tableau
+    setSpinResults(prev => [...prev, { amount: winAmount, isGain: segment.isGain }]);
+    setTotalWinAmount(prev => prev + winAmount);
+    
     updateStats(PARTICIPATION_COST * selectedSpins, winAmount);
     
     if (segment.isGain && segment.amount > 0) {
@@ -226,6 +232,11 @@ export const Roulette = () => {
       playLose();
       setTimeout(() => setShowLoseAnimation(false), 2000);
     }
+
+    // Si c'était le dernier spin, afficher tous les résultats
+    if (spinResults.length + 1 === selectedSpins) {
+      setShowAllResults(true);
+    }
   };
 
   const handleSignTransaction = async (transaction: Transaction) => {
@@ -242,9 +253,16 @@ export const Roulette = () => {
     }
   }, [isPlaying, togglePlay]);
 
+  const handleNewSpinSeries = () => {
+    setSpinResults([]);
+    setShowAllResults(false);
+    setTotalWinAmount(0);
+    setSpinCount(0);
+    setIsMaxSpinsReached(false);
+  };
+
   return (
     <div className="flex flex-col items-center space-y-8" onClick={handleFirstInteraction}>
-      <TokenTracker />
       <MusicPlayer
         isPlaying={isPlaying}
         volume={volume}
@@ -433,6 +451,37 @@ export const Roulette = () => {
         message={txMessage}
         signature={txSignature}
       />
+
+      {/* Résultats de tous les spins */}
+      {showAllResults && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-xl p-8 max-w-lg w-full mx-4">
+            <h3 className="text-2xl font-bold mb-4 text-center">Spin Results</h3>
+            <div className="space-y-4 mb-6">
+              {spinResults.map((result, index) => (
+                <div key={index} className="flex justify-between items-center bg-gray-800 p-4 rounded-lg">
+                  <span className="text-lg">Spin {index + 1}</span>
+                  <span className={`text-lg font-bold ${result.isGain ? 'text-solana-green' : 'text-red-500'}`}>
+                    {result.isGain ? `+${result.amount} SOL` : 'No win'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="text-center mb-6">
+              <p className="text-xl mb-2">Total Winnings</p>
+              <p className="text-3xl font-bold text-solana-green">{totalWinAmount.toFixed(2)} SOL</p>
+            </div>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={handleNewSpinSeries}
+                className="px-6 py-3 bg-solana-purple text-white font-bold rounded-lg hover:bg-solana-purple/80 transition"
+              >
+                Start New Series
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
